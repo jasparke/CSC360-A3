@@ -64,6 +64,6 @@ int main (int argc, char* argv[]) {
     }
 
     close(file);
-    munmap(diskimg, bufffer.st_size);
+    munmap(diskimg, buffer.st_size);
     return 0;
 }
