@@ -1,5 +1,6 @@
 #include "common.h"
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 
 /*
@@ -58,6 +59,58 @@ int getFreeSpace(int diskSize, char* img) {
     return SEC_LEN * f;
 }
 
-int sizeOfFile(char* fname, char* img) {
-    return 1;
+int fileSize(char* name, char* img) {
+
+    while (img[0] != 0x00) {
+        if ((img[11] & 0b00000010) == 0b00000000 && (img[11] & 0b00001000) == 0) {
+            int i;
+
+            char* cname = malloc(sizeof(char));
+            char* cext = malloc(sizeof(char));
+            for (i = 0; i < 8; i++)
+                if (img[i] == ' ') break;
+                else cname[i] = img[i];
+
+            for (i = 0; i < 3; i++) cext[i] = img[i+8];
+            strcat(cname, ".");
+            strcat(cname, cext);
+
+            if (strcmp(name, cname) == 0) {
+                int size = img[28] & 0xFF;
+                size += (img[29] & 0xFF) << 8;
+                size += (img[30] & 0xFF << 16);
+                size += (img[31] & 0xFF) << 24;
+                return size;
+            }
+
+        }
+        img += 32;
+    }
+
+    return 0;
+}
+
+int fileExists(char* name, char* img) {
+
+    while (img[0] != 0x00) {
+        if ((img[11] & 0b00000010) == 0b00000000 && (img[11] & 0b00001000) == 0) {
+            int i;
+
+            char* cname = malloc(sizeof(char));
+            char* cext = malloc(sizeof(char));
+            for (i = 0; i < 8; i++)
+                if (img[i] == ' ') break;
+                else cname[i] = img[i];
+
+            for (i = 0; i < 3; i++) cext[i] = img[i+8];
+            strcat(cname, ".");
+            strcat(cname, cext);
+
+            if (strcmp(name, cname) == 0) return 1;
+
+        }
+        img += 32;
+    }
+
+    return 0;
 }
