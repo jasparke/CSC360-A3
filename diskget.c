@@ -89,7 +89,7 @@ int main (int argc, char* argv[]) {
           munmap(fileimg, size);
           close(destfile);
 
-     } else printf("File %s not found in %s.\n", argv[2], argv[1]);
+     } else printf("File not found.\n");
 
      close(file);
      munmap(diskimg, buffer.st_size);
