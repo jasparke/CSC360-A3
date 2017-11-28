@@ -24,17 +24,7 @@ Sectors per FAT:
 /* Helper Functions */
 
 void printDiskInfo(char* os, char* label, int diskSize, int freeSize, int rootFiles, int fatCopies, int sectors) {
-    printf("OS Name: %s\n
-            Label of the disk: %s\n
-            Total size of the disk: %d\n
-            Free size of the disk: %d\n
-            \n
-            ==============\n
-            The number of files in the root directory (not including subdirectories): %d\n
-            \n
-            =============\n
-            Number of FAT copies: %d\n
-            Sectors per FAT: %d\n",
+    printf("OS Name:Label of the disk:Total size of the disk:Free size of the disk:===========The number of files in the root directory (not including subdirectories):==========Number of FAT copies:Sectors per FAT: %d\n",
            os, label, diskSize, freeSize, rootFiles, fatCopies, sectors);
 }
 
