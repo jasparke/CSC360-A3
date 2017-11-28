@@ -21,7 +21,7 @@ Sectors per FAT:
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <common.h>
+#include "common.h"
 
 
 /* Helper Functions */
@@ -32,23 +32,24 @@ void errorAndExit(char* errstring) {
 }
 
 void findLabel(char* buffer, char* img) {
+    int i;
     for (i = 0; i < 8; i++) buffer[i] = img[i+43];
 
-    if (label[0] == ' ') {
+    if (buffer[0] == ' ') {
         img += SECTOR_LENGTH * 19;
         while (img[0] != 0x00) {
-            if (p[11] == 8) for (i = 0; i < 8; i++) label[i] = p[i];
-            p+= 32;
+            if (img[11] == 8) for (i = 0; i < 8; i++) buffer[i] = img[i];
+            img+= 32;
         }
     }
 }
 
-int getNumRootFiles(char* map) {
-    map += SECTOR_LENGTH * 19;
+int getNumRootFiles(char* img) {
+    img += SECTOR_LENGTH * 19;
     int c = 0;
-    while (p[0] != 0x00) {
-        if ((p[11] & 0b00000010) == 0 && (p[11] & 0b00001000) == 0 && (p[11] & 0b00010000) == 0) c++;
-        p+= 32;
+    while (img[0] != 0x00) {
+        if ((img[11] & 0b00000010) == 0 && (img[11] & 0b00001000) == 0 && (img[11] & 0b00010000) == 0) c++;
+        img+= 32;
     }
     return c;
 }
