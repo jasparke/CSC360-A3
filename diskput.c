@@ -10,86 +10,114 @@ To validate, you can use diskget implemented in Part III to check if you can cor
 system.
  */
 
- #include <stdio.h>
- #include <stdlib.h>
- #include <fcntl.h>
- #include <unistd.h>
- #include <sys/mman.h>
- #include <sys/types.h>
- #include <sys/stat.h>
- #include "common.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
+#include "common.h"
 
 
- void copyFromMem(char* dimg, char* fimg, int size, char* name) {
-      int start = fileStartSector(name, dimg + SEC_LEN*19);
-      int n = start;
-      int rem = size;
-      int addr; //ignore first sectors
+void updateRoot(char* dimg, int n, int size, char* name) {
+     // loop until we find a free root directory
+     dimg += SEC_LEN * 19;
+     while (dimg[0] != 0x00) dimg += 32;
 
-      do {
-           n = (rem == size) ? n : FATLookup(n, dimg);
-           addr = SEC_LEN * (31 + n);
+     int i, j = -1;
+     for (i = 0; i < 8; i++) {
+          if (name[i] == '.') j = i; // write till we hit the extension
+          dimg[i] = (j == -1) ? name[i] : ' ';
+     }
 
-           int i;
-           for (i = 0; i < SEC_LEN; i++) {
-                if (rem == 0) break;
-                fimg[size - rem] = dimg[i + addr];
-                rem --;
-           }
-      } while (FATLookup(n, dimg) != 0xFFF);
+     for (i = 0; i < 3; i++) dimg[i+8] = name[i+j+1];
 
- }
+     dimg[11] = 0x00; // attributes go to 0;
 
- /********
-  * Main *
-  ********/
- int main (int argc, char* argv[]) {
-      if (argc < 3) errorAndExit("Error: Invalid arguments. See README.\n Usage: diskget <image file> <filetoget>\n");
+     //time shifts
+     time_t t = time(NULL);
+     struct tm *l = localtime(&t);
+     for (i = 14; i < 18; i++) dimg[i] = 0;
+     dimg[17] |= (l->tm_year) << 1;
+     dimg[17] |= (l->tm_mon - ((dimg[16] & 0b11100000) >> 5)) >> 3;
+     dimg[16] |= (l->tm_mon - ((dimg[17] & 0b00000001) << 3)) << 5;
+     dimg[16] |= l->tm_mday & 0b00011111;
+     dimg[15] |= (l->tm_hour << 3) & 0b11111000;
+     dimg[15] |= (l->tm_min - ((dimg[14] & 0b11100000) >> 5)) >> 3;
+     dimg[14] |= (l->tm_min - ((dimg[15] & 0b00000111) << 3)) << 5;
 
-      int file = open(argv[1], O_RDWR);
-      if (file < 0) errorAndExit("Error: Could not read disk image.");
+     //set start point;
+     dimg[26] = (n - (dimg[27] << 8)) & 0xFF;
+     dimg[27] = (n - dimg[26]) >> 8;
 
-      struct stat buffer;
-      fstat(file, &buffer);
-      char* diskimg = mmap(0, buffer.st_size, PROT_READ, MAP_SHARED, file, 0);
-      if (diskimg == MAP_FAILED) errorAndExit("Error: failed to map image to memory.");
+     //save the file size
+     dimg[28] = size & 0x000000FF;
+     dimg[29] = (size & 0x0000FF00) >> 8;
+     dimg[30] = (size & 0x00FF0000) >> 16;
+     dimg[31] = (size & 0xFF000000) >> 24;
+}
 
-      int size = fileSize(argv[2], diskimg + SEC_LEN * 19);
-      if (size > 0) { // file actually exists
-           int destfile = open(argv[2], O_RDWR | O_CREAT, 0644);
-           if (destfile < 0) {
-                munmap(diskimg, buffer.st_size);
-                close(destfile);
-                errorAndExit("Error: Could not open or create destination file");
-           }
+void copyToMem(char* dimg, char* fimg, int size, char* name) {
+     if (!fileExists(name, dimg + SEC_LEN * 19)) {
+          int rem = size;
+          int n = FATGetFree(dimg);
 
-           int status = lseek(destfile, size - 1, SEEK_SET); // go to the end of our new destfile
-           if (status == -1) {
-                munmap(diskimg, buffer.st_size);
-                close(file);
-                close(destfile);
-                errorAndExit("Error: Could not move through destination file");
-           }
+          updateRoot(dimg, n, size, name);
 
-           status = write(destfile, "", 1); // write a null character to mark end
-           if (status != 1) {
-                munmap(diskimg, buffer.st_size);
-                close(file);
-                close(destfile);
-                errorAndExit("Error: Could not write to destination file");
-           }
+          while (rem > 0) {
+               int addr = SEC_LEN * (31 + n);
 
-           char* fileimg = mmap(0, size, PROT_WRITE, MAP_SHARED, destfile, 0);
-           if (fileimg == MAP_FAILED) errorAndExit("Error: failed to map destiantion file to memory.");
+               int i;
+               for (i = 0; i < SEC_LEN; i++) {
+                    if (rem == 0) {
+                         FATSet(n, 0xFFF, dimg);
+                         return;
+                    }
+                    dimg[i + addr] = fimg[size-rem];
+                    rem--;
+               }
+               FATSet(n, 0x69, dimg);
+               i = FATGetFree(dimg);
+               FATSet(n, i, dimg);
+               n = i;
+          }
+     }
+}
 
-           copyFromMem(diskimg, fileimg, size, argv[2]);
+/********
+ * MAIN *
+ ********/
+int main (int argc, char* argv[]) {
+     if (argc < 3) errorAndExit("Error: Invalid arguments. See README.\n Usage: diskget <image file> <filetoget>\n");
 
-           munmap(fileimg, size);
-           close(destfile);
+     int file = open(argv[1], O_RDWR);
+     if (file < 0) errorAndExit("Error: Could not read disk image.");
 
-      } else printf("File not found.\n");
+     struct stat buffer;
+     fstat(file, &buffer);
+     char* diskimg = mmap(0, buffer.st_size, PROT_READ, MAP_SHARED, file, 0);
+     if (diskimg == MAP_FAILED) errorAndExit("Error: failed to map image to memory.");
 
-      close(file);
-      munmap(diskimg, buffer.st_size);
-      return 0;
-  }
+     int srcfile = open(argv[2], O_RDWR);
+     if (srcfile < 0) {
+         munmap(diskimg, buffer.st_size);
+         close(srcfile);
+         errorAndExit("File not found.");
+     }
+
+     struct stat fbuffer;
+     fstat(srcfile, &fbuffer);
+     char* srcimg = mmap(0, fbuffer.st_size, PROT_READ, MAP_SHARED, srcfile, 0);
+     if (srcimg == MAP_FAILED) errorAndExit("Error: failed to map file to memory.");
+
+     if (getFreeSpace(getDiskSize(diskimg), diskimg) >= fbuffer.st_size) copyToMem(srcimg, diskimg, fbuffer.st_size, argv[2]);
+     else printf("Not enough free space in the disk image.\n");
+
+     close(file);
+     close(srcfile);
+     munmap(diskimg, buffer.st_size);
+     munmap(srcimg, fbuffer.st_size);
+     return 0;
+}

@@ -13,6 +13,26 @@
      exit(1);
  }
 
+/*
+    set an entry to val in the fat table
+ */
+void FATSet(int entry, int val, char* img) {
+    img += SEC_LEN;
+
+    int n = (int)(3 * entry / 2);
+
+    if (entry % 2 == 0) { // even
+        img[SEC_LEN + n + 1] = (val >> 8) & 0x0F; //low four
+        img[SEC_LEN + n] = val & 0xFF; // all 8
+    } else { // odd
+        img[SEC_LEN + n] = (val << 4) & 0xF0;
+        img[SEC_LEN + n + 1] = (val >> 4) & 0xFF;
+    }
+}
+
+/*
+    Lookup an entry in the fat table.
+ */
 int FATLookup(int entry, char* img) {
     int val;
 
@@ -38,6 +58,17 @@ int FATLookup(int entry, char* img) {
     }
 
     return val;
+}
+
+/*
+    Get the next free pos in the fat table
+*/
+int FATGetFree(char* img) {
+    img += SEC_LEN;
+
+    int n = 2;
+    while (FATLookup(n, img) != 0x000) n++;
+    return n;
 }
 
 /*
