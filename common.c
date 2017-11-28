@@ -40,6 +40,9 @@ int getFatEntry(int entry, char* img) {
     return val;
 }
 
+/*
+    return size of disk from boot sector
+ */
 int getDiskSize(char* img) {
     int b = img[11] + (img[12] << 8);
     int s = img[19] + (img[20] << 8);
@@ -59,22 +62,25 @@ int getFreeSpace(int diskSize, char* img) {
     return SEC_LEN * f;
 }
 
+/*
+    find and return the size of a file name if it is found in a map img.
+    0 is returned if file not found
+ */
 int fileSize(char* name, char* img) {
-
     while (img[0] != 0x00) {
         if ((img[11] & 0b00000010) == 0b00000000 && (img[11] & 0b00001000) == 0) {
             int i;
 
             char* cname = malloc(sizeof(char));
             char* cext = malloc(sizeof(char));
-            for (i = 0; i < 8; i++)
+            for (i = 0; i < 8; i++) //read current file name
                 if (img[i] == ' ') break;
                 else cname[i] = img[i];
 
-            for (i = 0; i < 3; i++) cext[i] = img[i+8];
+            for (i = 0; i < 3; i++) cext[i] = img[i+8]; //read current file extension
+
             strcat(cname, ".");
             strcat(cname, cext);
-
             if (strcmp(name, cname) == 0) {
                 int size = img[28] & 0xFF;
                 size += (img[29] & 0xFF) << 8;
@@ -86,12 +92,13 @@ int fileSize(char* name, char* img) {
         }
         img += 32;
     }
-
     return 0;
 }
 
+/*
+    search through entries to find a file name. if it exists, return 1, else 0.
+ */
 int fileExists(char* name, char* img) {
-
     while (img[0] != 0x00) {
         if ((img[11] & 0b00000010) == 0b00000000 && (img[11] & 0b00001000) == 0) {
             int i;
@@ -103,9 +110,9 @@ int fileExists(char* name, char* img) {
                 else cname[i] = img[i];
 
             for (i = 0; i < 3; i++) cext[i] = img[i+8];
+
             strcat(cname, ".");
             strcat(cname, cext);
-
             if (strcmp(name, cname) == 0) return 1;
 
         }
@@ -113,4 +120,30 @@ int fileExists(char* name, char* img) {
     }
 
     return 0;
+}
+
+/*
+    Return the first cluster number of the file, -1 if not found
+ */
+int getStartCluster(char* name, char* img) {
+    while (img[0] != 0x00) {
+        if ((img[11] & 0b00000010) == 0b00000000 && (img[11] & 0b00001000) == 0) {
+            int i;
+
+            char* cname = malloc(sizeof(char));
+            char* cext = malloc(sizeof(char));
+            for (i = 0; i < 8; i++) //read current file name
+                if (img[i] == ' ') break;
+                else cname[i] = img[i];
+
+            for (i = 0; i < 3; i++) cext[i] = img[i+8]; //read current file extension
+
+            strcat(cname, ".");
+            strcat(cname, cext);
+            if (strcmp(name, cname) == 0) return p[26] + (p[27] << 8);
+
+        }
+        img += 32;
+    }
+    return -1;
 }
