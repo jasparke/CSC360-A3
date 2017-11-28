@@ -19,36 +19,80 @@ Sectors per FAT:
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <common.h>
 
 
 /* Helper Functions */
 
-void printDiskInfo(char* os, char* label, int diskSize, int freeSize, int rootFiles, int fatCopies, int sectors) {
-    printf("OS Name: %s\n
-            Label of the disk: %s\n
-            Total size of the disk: %d\n
-            Free size of the disk: %d\n
-            \n
-            ==============\n
-            The number of files in the root directory (not including subdirectories): %d\n
-            \n
-            =============\n
-            Number of FAT copies: %d\n
-            Sectors per FAT: %d\n",
-           os, label, diskSize, freeSize, rootFiles, fatCopies, sectors);
+void errorAndExit(char* errstring) {
+    printf("%s\n", errstring);
+    exit(1);
+}
+
+void findLabel(char* buffer, char* img) {
+    for (i = 0; i < 8; i++) buffer[i] = img[i+43];
+
+    if (label[0] == ' ') {
+        img += SECTOR_LENGTH * 19;
+        while (img[0] != 0x00) {
+            if (p[11] == 8) for (i = 0; i < 8; i++) label[i] = p[i];
+            p+= 32;
+        }
+    }
+}
+
+int getNumRootFiles(char* map) {
+    map += SECTOR_LENGTH * 19;
+    int c = 0;
+    while (p[0] != 0x00) {
+        if ((p[11] & 0b00000010) == 0 && (p[11] & 0b00001000) == 0 && (p[11] & 0b00010000) == 0) c++;
+        p+= 32;
+    }
+    return c;
+}
+
+void printDiskInfo(char* os, char* label, int diskSize, int freeSpace, int rootFiles, int fatCopies, int sectors) {
+    printf("OS Name: %s\n", os);
+    printf("Label of the disk: %s\n", label);
+    printf("Total size of the disk: %d\n", diskSize);
+    printf("Free size of the disk: %d\n", freeSpace);
+    printf("\n==============\n");
+    printf("The number of files in the root directory (not including subdirectories): %d\n", rootFiles);
+    printf("\n=============\n");
+    printf("Number of FAT copies: %d\n", fatCopies);
+    printf("Sectors per FAT: %d\n", sectors);
 }
 
 /********
  * Main *
  ********/
-if main (int argc, char* argv[]) {
-    if (argc < 2) {
-        printf("Error: Invalid arguments.\n
-                USAGE: diskinfo <DISK IMAGE>");
-        exit(1);
-    }
+int main (int argc, char* argv[]) {
+    if (argc < 2) errorAndExit("Error: Invalid arguments. See README.");
 
-    printDiskInfo("hi", "label", 1,2,3,4,5);
+    int file = open(argv[1], O_RDWR);
+    if (file < 0) errorAndExit("Error: Could not read disk image.");
+
+    struct stat buffer;
+    fstat(file, &buffer);
+    char* diskimg = mmap(0, buffer.st_size, PROT_READ, MAP_SHARED, file, 0);
+    if (diskimg == MAP_FAILED) errorAndExit("Error: failed to map image to memory.");
+
+    // Get OS name (pos 3, 8bytes)
+    int i;
+    char* os = malloc(sizeof(char));
+    for (i = 0; i < 8; i++) os[i] = diskimg[i+3];
+
+    char* label = malloc(sizeof(char));
+    findLabel(label, diskimg);
+
+    int diskSize = getDiskSize(diskimg);
+    int freeSize = getFreeSpace(diskSize, diskimg);
+    int rootFiles = getNumRootFiles(diskimg);
+    int fatCopies = diskimg[16];
+    int sectors = diskimg[22] + (diskimg[23] << 8);
+    printDiskInfo(os, label, diskSize, freeSize, rootFiles, fatCopies, sectors);
 
     return 0;
 }
