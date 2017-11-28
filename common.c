@@ -13,7 +13,7 @@
      exit(1);
  }
 
-int getFatEntry(int entry, char* img) {
+int FATLookup(int entry, char* img) {
     int val;
 
     int a;
@@ -57,10 +57,12 @@ int getFreeSpace(int diskSize, char* img) {
     int i = 2;
 
     for (; i < (diskSize/SEC_LEN); i++)
-        if (getFatEntry(i, img) == 0x000) f++;
+        if (FATLookup(i, img) == 0x000) f++;
 
     return SEC_LEN * f;
 }
+
+//COULD: probably merge these 3 functions as most of the code is the same... use flag?
 
 /*
     find and return the size of a file name if it is found in a map img.
@@ -123,9 +125,9 @@ int fileExists(char* name, char* img) {
 }
 
 /*
-    Return the first cluster number of the file, -1 if not found
+    Return the first sector of the file, -1 if not found
  */
-int getStartCluster(char* name, char* img) {
+int fileStartSector(char* name, char* img) {
     while (img[0] != 0x00) {
         if ((img[11] & 0b00000010) == 0b00000000 && (img[11] & 0b00001000) == 0) {
             int i;
@@ -140,7 +142,7 @@ int getStartCluster(char* name, char* img) {
 
             strcat(cname, ".");
             strcat(cname, cext);
-            if (strcmp(name, cname) == 0) return p[26] + (p[27] << 8);
+            if (strcmp(name, cname) == 0) return img[26] + (img[27] << 8);
 
         }
         img += 32;

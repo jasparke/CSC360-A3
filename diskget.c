@@ -21,12 +21,32 @@ to read the content of ANS1.PDF.
 #include <sys/stat.h>
 #include "common.h"
 
+
+void copyFromMem(char* dimg, char* fimg, int size, char* name) {
+     int start = fileStartSector(name, dimg + SEC_LEN*19);
+     int n = start;
+     int rem = size;
+     int addr; //ignore first sectors
+
+     do {
+          n = (rem == size) ? n : FATLookup(n, dimg);
+          addr = SEC_LEN * (31 + n);
+
+          int i;
+          for (i = 0; i < SEC_LEN; i++) {
+               if (rem == 0) break;
+               fimg[size - rem] = dimg[i + addr];
+               rem --;
+          }
+     } while (FATLookup(n, dimg) != 0xFFF);
+
+}
+
 /********
  * Main *
  ********/
 int main (int argc, char* argv[]) {
-     if (argc < 3) errorAndExit("Error: Invalid arguments. See README.\n
-	 							 Usage: diskget <image file> <filetoget>\n");
+     if (argc < 3) errorAndExit("Error: Invalid arguments. See README.\n Usage: diskget <image file> <filetoget>\n");
 
      int file = open(argv[1], O_RDWR);
      if (file < 0) errorAndExit("Error: Could not read disk image.");
@@ -41,7 +61,7 @@ int main (int argc, char* argv[]) {
           int destfile = open(argv[2], O_RDWR | O_CREAT, 0644);
           if (destfile < 0) {
                munmap(diskimg, buffer.st_size);
-               close(realfile);
+               close(destfile);
                errorAndExit("Error: Could not open or create destination file");
           }
 
@@ -63,6 +83,8 @@ int main (int argc, char* argv[]) {
 
           char* fileimg = mmap(0, size, PROT_WRITE, MAP_SHARED, destfile, 0);
           if (fileimg == MAP_FAILED) errorAndExit("Error: failed to map destiantion file to memory.");
+
+          copyFromMem(diskimg, fileimg, size, argv[2]);
 
           munmap(fileimg, size);
           close(destfile);
