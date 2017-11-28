@@ -1,6 +1,6 @@
-#define SECTOR_LENGTH 512
+#define SEC_LEN 512
 
-int getFatEntry(int entry, char* map);
-int getDiskSize(char* map);
-int getFreeSpace(int diskCap, char* map);
-int sizeOfFile(char* fname, char* map);
+int getFatEntry(int entry, char* img);
+int getDiskSize(char* img);
+int getFreeSpace(int diskCap, char* img);
+int sizeOfFile(char* fname, char* img);

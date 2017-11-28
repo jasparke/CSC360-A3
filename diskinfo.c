@@ -17,10 +17,15 @@ Number of FAT copies:
 Sectors per FAT:
 */
 
+/*
+    http://www.dfists.ua.es/~gil/FAT12Description.pdf
+    FAT12 byte layout on page2.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "common.h"
@@ -38,7 +43,7 @@ void findLabel(char* buffer, char* img) {
     for (i = 0; i < 8; i++) buffer[i] = img[i+43];
 
     if (buffer[0] == ' ') {
-        img += SECTOR_LENGTH * 19;
+        img += SEC_LEN * 19;
         while (img[0] != 0x00) {
             if (img[11] == 8) for (i = 0; i < 8; i++) buffer[i] = img[i];
             img+= 32;
@@ -47,7 +52,7 @@ void findLabel(char* buffer, char* img) {
 }
 
 int getNumRootFiles(char* img) {
-    img += SECTOR_LENGTH * 19;
+    img += SEC_LEN * 19;
     int c = 0;
     while (img[0] != 0x00) {
         if ((img[11] & 0b00000010) == 0 && (img[11] & 0b00001000) == 0 && (img[11] & 0b00010000) == 0) c++;
