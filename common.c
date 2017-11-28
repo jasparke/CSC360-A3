@@ -1,9 +1,17 @@
 #include "common.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 /*
     http://www.dfists.ua.es/~gil/FAT12Description.pdf
     FAT12 byte layout on page2.
  */
+
+ void errorAndExit(char* err) {
+     printf("%s\n", err);
+     exit(1);
+ }
+
 int getFatEntry(int entry, char* img) {
     int val;
 

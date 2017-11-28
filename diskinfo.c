@@ -33,11 +33,6 @@ Sectors per FAT:
 
 /* Helper Functions */
 
-void errorAndExit(char* errstring) {
-    printf("%s\n", errstring);
-    exit(1);
-}
-
 void findLabel(char* buffer, char* img) {
     int i;
     for (i = 0; i < 8; i++) buffer[i] = img[i+43];
@@ -102,5 +97,7 @@ int main (int argc, char* argv[]) {
     int sectors = diskimg[22] + (diskimg[23] << 8);
     printDiskInfo(os, label, diskSize, freeSize, rootFiles, fatCopies, sectors);
 
+    close(file);
+    munmap(diskimg, buffer.st_size);
     return 0;
 }
